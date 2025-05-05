@@ -225,7 +225,7 @@ def main():
 
     try:
         asyncio.run(asyncio.gather(
-            camera_loop(cap, q_error, cfg | {"writer": writer}),
+            camera_loop(cap, q_error, {**cfg, "writer": writer}),
             control_loop(q_error, q_omega),
             serial_loop(q_omega, ser),
         ))
