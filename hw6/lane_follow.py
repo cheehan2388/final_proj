@@ -224,11 +224,13 @@ def main():
     q_omega = asyncio.Queue(maxsize=1)
 
     try:
-        asyncio.run(asyncio.gather(
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.gather(
             camera_loop(cap, q_error, {**cfg, "writer": writer}),
             control_loop(q_error, q_omega),
             serial_loop(q_omega, ser),
         ))
+
     except KeyboardInterrupt:
         print("\n[INFO] Exit by Ctrl‑C")
     finally:
