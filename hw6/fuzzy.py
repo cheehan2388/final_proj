@@ -3,7 +3,7 @@
 終端指令：
     python lane_following_pi.py --port /dev/ttyAMA0 --baud 115200 --camera 0
 
-Raspberry Pi 讀取相機 → 計算 offset → 模糊控制 → 經 UART 傳給 Arduino
+Raspberry Pi 讀取相機 → 計算 offset → 模糊控制 → 經 UART 傳給 Arduino
 -----------------------------------------------------------------------------  
 必要第三方：
     pip install opencv-python numpy pyserial scikit-fuzzy
@@ -15,7 +15,7 @@ import asyncio
 import time
 from collections import deque
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -72,7 +72,7 @@ def region_of_interest(img: np.ndarray, bottom_ratio: float = 0.33) -> np.ndarra
     return cv2.bitwise_and(img, mask)
 
 
-def detect_lane(frame: np.ndarray) -> tuple[Optional[float], np.ndarray]:
+def detect_lane(frame: np.ndarray) -> Tuple[Optional[float], np.ndarray]:
     """回傳 lane_center_x (None 若無) 及 Debug frame"""
     debug = frame.copy()
     h, w = frame.shape[:2]
@@ -230,7 +230,7 @@ def main():
             serial_loop(q_omega, ser),
         ))
     except KeyboardInterrupt:
-        print("\n[INFO] Exit by Ctrl-C")
+        print("\n[INFO] Exit by Ctrl‑C")
     finally:
         cap.release()
         if writer:
