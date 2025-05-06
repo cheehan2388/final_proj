@@ -154,13 +154,15 @@ except ModuleNotFoundError:
 # ---------------------------------------------------------------------------
 # Serial sending
 # ---------------------------------------------------------------------------
-
 def format_msg(omega_norm: float) -> bytes:
-    base  = 80                     # 你的巡航速度
-    delta = int(omega_norm * 40)   # 最大左右差速 ±40
+    base  = 80
+    delta = int(omega_norm * 40)
     left  = base + delta
     right = base - delta
-    return f"<L:{left},R:{right}>\\n".encode()
+    msg = f"<L:{left},R:{right}>\n".encode()
+    print(f"Sending: {msg}")  # 除錯用，確認傳送內容
+    return msg
+
 # ---------------------------------------------------------------------------
 # Async loops
 # ---------------------------------------------------------------------------
