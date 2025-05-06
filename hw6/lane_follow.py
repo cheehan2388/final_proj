@@ -128,29 +128,49 @@ def detect_lane(frame: np.ndarray) -> Tuple[Optional[float], np.ndarray]:
 try:
     import skfuzzy as fuzz
     from skfuzzy import control as ctrl
+    
+    # Define universes for error (e), change in error (de), and output (w)
     e_univ = ctrl.Antecedent(np.linspace(-1, 1, 7), "e")
     de_univ = ctrl.Antecedent(np.linspace(-1, 1, 7), "de")
     w_univ = ctrl.Consequent(np.linspace(-1, 1, 7), "w")
     names = ["NB", "NM", "NS", "Z", "PS", "PM", "PB"]
+    
+    # Automatically assign membership functions
     for ant in (e_univ, de_univ, w_univ):
         ant.automf(names=names)
+    
+    # Define a rule table for fuzzy PD control (7x7 matrix, indices 0=NB to 6=PB)
+    rule_table = [
+        [0, 0, 0, 1, 2, 3, 4],  # e=NB: Strong negative action when de is negative, reducing as de becomes positive
+        [0, 0, 1, 2, 3, 4, 5],  # e=NM
+        [0, 1, 2, 3, 4, 5, 6],  # e=NS
+        [1, 2, 3, 4, 5, 6, 6],  # e=Z: Output mirrors de when e is zero
+        [2, 3, 4, 5, 6, 6, 6],  # e=PS
+        [3, 4, 5, 6, 6, 6, 6],  # e=PM
+        [4, 5, 6, 6, 6, 6, 6],  # e=PB: Strong positive action, increasing with positive de
+    ]
+    
+    # Generate rules based on the rule table
     rules = []
-    for i, en in enumerate(names):
-        for j, den in enumerate(names):
-            out_idx = 6 - max(min(i + j - 6, 6), 0)
-            rules.append(ctrl.Rule(e_univ[en] & de_univ[den], w_univ[names[out_idx]]))
+    for i in range(7):
+        for j in range(7):
+            out_idx = rule_table[i][j]
+            rules.append(ctrl.Rule(e_univ[names[i]] & de_univ[names[j]], w_univ[names[out_idx]]))
+    
+    # Create and simulate the fuzzy control system
     fuzzy_ctrl = ctrl.ControlSystem(rules)
     fuzzy_sim = ctrl.ControlSystemSimulation(fuzzy_ctrl)
+    
     def fuzzy_controller(e: float, de: float) -> float:
         fuzzy_sim.input["e"] = e
         fuzzy_sim.input["de"] = de
         fuzzy_sim.compute()
         return float(fuzzy_sim.output["w"])
+        
 except ModuleNotFoundError:
-    print("[WARN] scikit-fuzzy not installed, fall back to PD controller")
+    print("[WARN] scikit-fuzzy not installed, falling back to PD controller")
     def fuzzy_controller(e: float, de: float, kp: float = 1.5, kd: float = 0.5):
         return np.tanh(kp * e + kd * de)
-
 # ---------------------------------------------------------------------------
 # Serial sending
 # ---------------------------------------------------------------------------
