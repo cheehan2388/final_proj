@@ -26,8 +26,8 @@ import serial
 # ---------------------------------------------------------------------------
 DEFAULTS = dict(
     port="/dev/ttyUSB0",   # Pi 世界常為這個；USB 轉 TTL 則可能 /dev/ttyUSB0
-    baud=115200,
-    camera=0,               # 若為 mp4 檔請填路徑字串
+    baud=57600,
+    camera=15,               # 若為 mp4 檔請填路徑字串
     width=640,
     height=480,
     roi_bottom_ratio=0.33,  # 只用底下那 1/3 區域找車道
@@ -156,10 +156,11 @@ except ModuleNotFoundError:
 # ---------------------------------------------------------------------------
 
 def format_msg(omega_norm: float) -> bytes:
-    steer_us = int(STEER_CENTER + omega_norm * STEER_RANGE)
-    msg = f"<STEER:{steer_us},SPEED:{BASE_SPEED}>\n"
-    return msg.encode()
-
+    base  = 80                     # 你的巡航速度
+    delta = int(omega_norm * 40)   # 最大左右差速 ±40
+    left  = base + delta
+    right = base - delta
+    return f"<L:{left},R:{right}>\\n".encode()
 # ---------------------------------------------------------------------------
 # Async loops
 # ---------------------------------------------------------------------------
