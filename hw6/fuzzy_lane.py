@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import serial
+import sys
 
 # ---------- Fuzzy Control Functions ----------
 def membership_LN(n_offset):
@@ -50,20 +51,11 @@ def fuzzy_controller(n_offset):
     fs_SP = membership_SP(n_offset)
     fs_LP = membership_LP(n_offset)
     
-    # Steering values: 1.0 (right), 0.0 (straight), -1.0 (left)
-    numerator = (fs_LN * 1.0 + fs_SN * 0.5 + fs_Z * 0.0 + fs_SP * (-0.5) + fs_LP * (-1.0))
+    numerator = (fs_LN * (-1.0) + fs_SN * (-0.5) + fs_Z * 0.0 + fs_SP * 0.5 + fs_LP * 1.0)
     denominator = fs_LN + fs_SN + fs_Z + fs_SP + fs_LP
     if denominator == 0:
         return 0.0
-    steering = numerator / denominator
-    
-    # Convert steering to discrete commands
-    if steering > 0.3:
-        return "right"
-    elif steering < -0.3:
-        return "left"
-    else:
-        return "straight"
+    return numerator / denominator
 
 # ---------- Original Functions ----------
 def preprocess(img):
@@ -91,13 +83,27 @@ def region_int(img):
 
 # ---------- Main Code ----------
 vid = cv2.VideoCapture(14)
-ser = serial.Serial('/dev/ttyUSB0', 57600)  # Adjust port as needed
+if not vid.isOpened():
+    print("Error: Failed to open camera")
+    sys.exit(1)
+print("Camera opened successfully")
+
+try:
+    ser = serial.Serial('/dev/ttyUSB0', 57600, timeout=1)
+    print("Serial port opened successfully")
+except serial.SerialException as e:
+    print(f"Error: Failed to open serial port: {e}")
+    vid.release()
+    sys.exit(1)
 
 half_lane_width_px = None
+base_speed = 100  # Base PWM value
+max_adjustment = 50  # Maximum PWM adjustment
 
 while True:
     ret, frame = vid.read()
     if not ret:
+        print("Error: Failed to capture frame")
         break
 
     h, w = frame.shape[:2]
@@ -168,22 +174,46 @@ while True:
     if lane_center_x is not None:
         offset = car_center_x - lane_center_x
         normalized_offset = offset / half_lane_width_px
-        direction = fuzzy_controller(normalized_offset)
-        ser.write(f"{direction}\n".encode())
+        steering = fuzzy_controller(normalized_offset)
+        
+        # Calculate PWM values
+        adjustment = int(steering * max_adjustment)
+        pwmL = base_speed - adjustment
+        pwmR = base_speed + adjustment
+        pwmL = max(0, min(255, pwmL))
+        pwmR = max(0, min(255, pwmR))
+        
+        command = f"<L:{pwmL},R:{pwmR}>\n"
+        try:
+            ser.write(command.encode())
+            print(f"Sending to Arduino: {command.strip()}")
+        except serial.SerialException as e:
+            print(f"Error sending to Arduino: {e}")
         
         # Display offset
         cv2.line(frame, (int(car_center_x), h),
                  (int(lane_center_x), h), (0,0,255), 3)
-        cv2.putText(frame, f"Offset: {offset:.1f}px Direction: {direction}",
+        cv2.putText(frame, f"Offset: {offset:.1f}px PWM L:{pwmL} R:{pwmR}",
                     (30, h-30), cv2.FONT_HERSHEY_SIMPLEX,
                     1.2, (0,0,255), 3)
     else:
-        ser.write("straight\n".encode())  # Default when no lane detected
+        # Default to stop when no lane detected
+        command = "<L:0,R:0>\n"
+        try:
+            ser.write(command.encode())
+            print("Sending to Arduino: <L:0,R:0> (no lane detected)")
+        except serial.SerialException as e:
+            print(f"Error sending to Arduino: {e}")
 
     cv2.imshow('Frame', frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
+        print("Quitting program")
         break
 
 vid.release()
 cv2.destroyAllWindows()
-ser.close()
+try:
+    ser.close()
+    print("Serial port closed")
+except serial.SerialException as e:
+    print(f"Error closing serial port: {e}")
