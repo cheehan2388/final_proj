@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import serial
 import sys
+import time
 
 # ---------- Fuzzy Control Functions ----------
 def membership_LN(n_offset):
@@ -190,6 +191,8 @@ while True:
         except serial.SerialException as e:
             print(f"Error sending to Arduino: {e}")
         
+        time.sleep(.5)
+        
         # Display offset
         cv2.line(frame, (int(car_center_x), h),
                  (int(lane_center_x), h), (0,0,255), 3)
@@ -204,7 +207,7 @@ while True:
             print("Sending to Arduino: <L:0,R:0> (no lane detected)")
         except serial.SerialException as e:
             print(f"Error sending to Arduino: {e}")
-
+        time.sleep(.5)
     cv2.imshow('Frame', frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         print("Quitting program")
